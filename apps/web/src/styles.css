@@ -1,0 +1,332 @@
+/* ---------- design tokens ---------- */
+:root {
+  --bg-page: #e7ebf0;
+  --bg-chat: #f4f6f9;
+  --bg-header: #ffffff;
+  --bg-composer: #ffffff;
+
+  --bubble-bot: #ffffff;
+  --bubble-user: #2aabee;
+  --bubble-error: #fdecea;
+  --bubble-error-text: #a43d34;
+
+  --text-primary: #1f2329;
+  --text-secondary: #6b7480;
+  --text-on-accent: #ffffff;
+  --text-placeholder: #98a0aa;
+
+  --border-subtle: #e3e7ec;
+  --shadow-bubble: 0 1px 2px rgba(15, 25, 40, 0.08);
+  --shadow-shell: 0 0 24px rgba(15, 25, 40, 0.06);
+
+  --radius-bubble: 18px;
+  --radius-tail: 4px;
+  --radius-control: 24px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+}
+
+/* ---------- reset / base ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+textarea {
+  font: inherit;
+}
+
+/* ---------- app shell (mobile-first) ---------- */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh; /* dvh handles mobile browser address bars correctly */
+  background: var(--bg-chat);
+}
+
+/* Center & frame on desktop */
+@media (min-width: 640px) {
+  body {
+    display: flex;
+    justify-content: center;
+  }
+  .app-shell {
+    width: 100%;
+    max-width: 720px;
+    box-shadow: var(--shadow-shell);
+  }
+}
+
+/* ---------- header ---------- */
+.chat-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.chat-header__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: linear-gradient(135deg, #2aabee, #3eb4f0);
+  color: white;
+  flex-shrink: 0;
+}
+
+.chat-header__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-header__name {
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.chat-header__subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.chat-header__reset {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+
+.chat-header__reset:hover {
+  background: var(--bg-chat);
+  color: var(--text-primary);
+}
+
+/* ---------- chat feed ---------- */
+.chat-feed {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ---------- bubble row (alignment wrapper) ---------- */
+.bubble-row {
+  display: flex;
+  width: 100%;
+}
+
+.bubble-row--bot {
+  justify-content: flex-start;
+}
+
+.bubble-row--user {
+  justify-content: flex-end;
+}
+
+/* ---------- bubble ---------- */
+.bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: var(--radius-bubble);
+  box-shadow: var(--shadow-bubble);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  animation: bubble-in var(--duration-base) ease-out;
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.bubble--bot {
+  background: var(--bubble-bot);
+  color: var(--text-primary);
+  border-bottom-left-radius: var(--radius-tail);
+}
+
+.bubble--user {
+  background: var(--bubble-user);
+  color: var(--text-on-accent);
+  border-bottom-right-radius: var(--radius-tail);
+}
+
+.bubble--error {
+  background: var(--bubble-error);
+  color: var(--bubble-error-text);
+}
+
+.bubble__text {
+  display: inline;
+}
+
+/* Streaming caret - one short pulsing bar at the end of a bot reply */
+.bubble__caret {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  background: var(--text-secondary);
+  animation: caret-blink 0.9s steps(2) infinite;
+}
+
+@keyframes caret-blink {
+  to {
+    opacity: 0;
+  }
+}
+
+/* ---------- typing indicator ---------- */
+.bubble--typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+}
+
+.bubble--typing .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-placeholder);
+  opacity: 0.4;
+  animation: dot-bounce 1.2s infinite ease-in-out;
+}
+
+.bubble--typing .dot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.bubble--typing .dot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+@keyframes dot-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+/* ---------- composer ---------- */
+.composer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  padding-bottom: max(var(--space-2), env(safe-area-inset-bottom));
+  background: var(--bg-composer);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.composer__input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding: 10px 14px;
+  background: var(--bg-chat);
+  color: var(--text-primary);
+  outline: none;
+  max-height: 140px;
+  transition: border-color var(--duration-fast);
+}
+
+.composer__input::placeholder {
+  color: var(--text-placeholder);
+}
+
+.composer__input:focus {
+  border-color: var(--bubble-user);
+}
+
+.composer__send {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bubble-user);
+  color: var(--text-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform var(--duration-fast), background var(--duration-fast);
+}
+
+.composer__send:not(:disabled):hover {
+  background: #1f9fdf;
+}
+
+.composer__send:not(:disabled):active {
+  transform: scale(0.95);
+}
+
+.composer__send svg {
+  /* paper-plane icon points right; nudge up-left so it looks centered */
+  transform: translate(-1px, 1px);
+}
