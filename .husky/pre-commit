@@ -1,0 +1,13 @@
+echo "▶ pre-commit: tsc (cli + server)"
+npm run tsc || exit 1
+
+echo "▶ pre-commit: tsc:web"
+npm run tsc:web || exit 1
+
+echo "▶ pre-commit: lint (eslint --fix)"
+npm run lint || exit 1
+
+echo "▶ pre-commit: format (prettier --write)"
+npm run format || exit 1
+
+echo "✓ pre-commit checks passed"

@@ -140,7 +140,9 @@ textarea {
   padding: 6px 12px;
   border-radius: var(--radius-control);
   font-size: 13px;
-  transition: background var(--duration-fast), color var(--duration-fast);
+  transition:
+    background var(--duration-fast),
+    color var(--duration-fast);
 }
 
 .chat-header__reset:hover {
@@ -315,7 +317,9 @@ textarea {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform var(--duration-fast), background var(--duration-fast);
+  transition:
+    transform var(--duration-fast),
+    background var(--duration-fast);
 }
 
 .composer__send:not(:disabled):hover {

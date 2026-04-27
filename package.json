@@ -11,12 +11,14 @@
     "build:node": "tsc -p tsconfig.build.json",
     "build:web": "vite build --config apps/web/vite.config.ts",
     "start:cli": "node --env-file=.env dist/apps/cli/index.js",
-    "start": "node --env-file=.env dist/apps/server/index.js",
+    "start:server": "node --env-file=.env dist/apps/server/index.js",
+    "start:web": "vite preview --config apps/web/vite.config.ts",
     "eval": "tsx --env-file=.env bot/evals/runEval.ts",
     "tsc": "tsc --noEmit",
     "tsc:web": "tsc --noEmit -p apps/web/tsconfig.json",
     "lint": "eslint --fix .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "prepare": "husky"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.1"
@@ -33,6 +35,7 @@
     "eslint-plugin-prettier": "^5.5.4",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^16.4.0",
+    "husky": "^9.1.7",
     "prettier": "^3.6.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

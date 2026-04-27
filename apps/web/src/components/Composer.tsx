@@ -61,10 +61,7 @@ export const Composer = ({ disabled, onSend }: Props) => {
         aria-label="Отправить"
       >
         <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-          <path
-            d="M3 11.5L21 3l-8.5 18-2.2-7.3L3 11.5z"
-            fill="currentColor"
-          />
+          <path d="M3 11.5L21 3l-8.5 18-2.2-7.3L3 11.5z" fill="currentColor" />
         </svg>
       </button>
     </form>

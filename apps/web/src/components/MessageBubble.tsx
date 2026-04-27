@@ -22,10 +22,13 @@ export const MessageBubble = ({ message }: Props) => {
 
   // Streaming bubbles get a subtle blinking caret at the end - hint that
   // more text is on the way.
-  const showStreamingCaret = !isUser && status === "streaming" && text.length > 0;
+  const showStreamingCaret =
+    !isUser && status === "streaming" && text.length > 0;
 
   return (
-    <div className={`bubble-row ${isUser ? "bubble-row--user" : "bubble-row--bot"}`}>
+    <div
+      className={`bubble-row ${isUser ? "bubble-row--user" : "bubble-row--bot"}`}
+    >
       <div className={bubbleClassName}>
         <span className="bubble__text">{text}</span>
         {showStreamingCaret && <span className="bubble__caret" aria-hidden />}
