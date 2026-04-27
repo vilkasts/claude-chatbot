@@ -5,7 +5,7 @@
 export const TypingIndicator = () => (
   <div className="flex w-full justify-start">
     <div
-      aria-label="Бот думает"
+      aria-label="bot thinking"
       className="flex items-center gap-1 rounded-bubble rounded-bl-tail bg-bubble-bot px-4 py-3 shadow-bubble"
     >
       <span className="size-[7px] rounded-full bg-text-placeholder opacity-40 animate-dot-bounce" />

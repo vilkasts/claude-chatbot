@@ -1,6 +1,7 @@
 {
   "name": "claude-chatbot",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "CLI chatbot built with the Anthropic Claude API — learning project",
   "type": "module",
   "main": "apps/cli/index.ts",

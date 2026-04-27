@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(npx husky *)",
+      "Bash(sh .husky/pre-commit)",
+      "Bash(curl -s http://localhost:3000/)"
+    ]
+  }
+}

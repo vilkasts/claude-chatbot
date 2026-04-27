@@ -37,7 +37,7 @@ export const App = () => {
         <button
           type="button"
           onClick={resetChat}
-          aria-label="Сбросить диалог"
+          aria-label="reset dialog"
           className="cursor-pointer rounded-control border border-border-subtle bg-transparent px-3 py-1.5 text-[13px] text-text-secondary transition-colors duration-[140ms] hover:bg-chat hover:text-text-primary"
         >
           Сбросить

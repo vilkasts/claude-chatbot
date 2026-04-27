@@ -1,8 +1,10 @@
-node_modules/
-.env
-*.log
-.DS_Store
 .idea/
 .vscode/
+.claude/settings.local.json
+
+node_modules/
 dist/
-.claude/
+
+.env
+.DS_Store
+*.log

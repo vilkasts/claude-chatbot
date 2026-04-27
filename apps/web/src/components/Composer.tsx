@@ -60,7 +60,7 @@ export const Composer = ({ disabled, onSend }: Props) => {
       <button
         type="submit"
         disabled={isSendDisabled}
-        aria-label="Отправить"
+        aria-label="send"
         className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-bubble-user text-text-on-accent transition-[transform,background] duration-[140ms] not-disabled:hover:bg-bubble-user-hover not-disabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {/* paper-plane icon points right; nudge up-left so it looks centered */}
