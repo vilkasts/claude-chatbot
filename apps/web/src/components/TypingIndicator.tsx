@@ -1,12 +1,16 @@
 // Three pulsing dots inside a bot-styled bubble. Shown only between the
 // moment the user sends and the first chunk of the model's reply. The
-// animation lives in styles.css (@keyframes blink).
+// dot-bounce keyframes are defined in styles.css and exposed as the
+// `animate-dot-bounce` Tailwind utility via @theme.
 export const TypingIndicator = () => (
-  <div className="bubble-row bubble-row--bot">
-    <div className="bubble bubble--bot bubble--typing" aria-label="Бот думает">
-      <span className="dot" />
-      <span className="dot" />
-      <span className="dot" />
+  <div className="flex w-full justify-start">
+    <div
+      aria-label="Бот думает"
+      className="flex items-center gap-1 rounded-bubble rounded-bl-tail bg-bubble-bot px-4 py-3 shadow-bubble"
+    >
+      <span className="size-[7px] rounded-full bg-text-placeholder opacity-40 animate-dot-bounce" />
+      <span className="size-[7px] rounded-full bg-text-placeholder opacity-40 animate-dot-bounce [animation-delay:0.18s]" />
+      <span className="size-[7px] rounded-full bg-text-placeholder opacity-40 animate-dot-bounce [animation-delay:0.36s]" />
     </div>
   </div>
 );

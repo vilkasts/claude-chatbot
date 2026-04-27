@@ -18,26 +18,33 @@ export const App = () => {
   }, [messages, isThinking]);
 
   return (
-    <div className="app-shell">
-      <header className="chat-header">
-        <div className="chat-header__avatar" aria-hidden>
+    <div className="flex h-dvh w-full flex-col bg-chat sm:max-w-[720px] sm:shadow-shell">
+      <header className="flex shrink-0 items-center gap-3 border-b border-border-subtle bg-header px-4 py-3">
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-bubble-user to-[#3eb4f0] text-[22px] text-white"
+          aria-hidden
+        >
           🤖
         </div>
-        <div className="chat-header__title">
-          <div className="chat-header__name">Clientsy Help Bot</div>
-          <div className="chat-header__subtitle">помощь по приложению</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-semibold text-text-primary">
+            Clientsy Help Bot
+          </div>
+          <div className="text-xs text-text-secondary">
+            помощь по приложению
+          </div>
         </div>
         <button
           type="button"
-          className="chat-header__reset"
           onClick={resetChat}
           aria-label="Сбросить диалог"
+          className="cursor-pointer rounded-control border border-border-subtle bg-transparent px-3 py-1.5 text-[13px] text-text-secondary transition-colors duration-[140ms] hover:bg-chat hover:text-text-primary"
         >
           Сбросить
         </button>
       </header>
 
-      <main className="chat-feed">
+      <main className="flex flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden p-4">
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} />
         ))}

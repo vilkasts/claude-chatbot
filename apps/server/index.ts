@@ -5,6 +5,8 @@ import http from "node:http";
 import path from "node:path";
 import process from "node:process";
 
+import type { ViteDevServer } from "vite";
+
 import {
   describeError,
   formatErrorWithContext,
@@ -20,6 +22,17 @@ import { closeSseStream, openSseStream, writeSseEvent } from "./sseRelay.js";
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const DOCS_DIRECTORY = path.resolve(process.cwd(), "bot", "docs");
 const CLIENT_DIST_DIR = path.resolve(process.cwd(), "apps", "web", "dist");
+const VITE_CONFIG_PATH = path.resolve(
+  process.cwd(),
+  "apps",
+  "web",
+  "vite.config.ts",
+);
+
+// Detect dev mode without NODE_ENV: in dev, this file is loaded as .ts via tsx
+// (cwd-relative path). In prod, it's the compiled .js inside dist/.
+// Cross-platform safe — no env var needed.
+const IS_DEV = !import.meta.url.includes("/dist/");
 
 // MIME map for the static-file fallback. We only ship a handful of asset
 // kinds, so a tiny lookup table beats pulling in `mime-types`.
@@ -214,21 +227,13 @@ const handleStatic = async (
 // http server
 // ---------------------------------------------------------------------------
 
+// Vite dev server lives here when IS_DEV. In prod it stays null and we serve
+// the prebuilt bundle from CLIENT_DIST_DIR via handleStatic.
+let viteDevServer: ViteDevServer | null = null;
+
 const httpServer = http.createServer((req, res) => {
   const url = req.url ?? "/";
   const method = req.method ?? "GET";
-
-  // Permissive CORS for local dev so vite (5173) can call this server (3000).
-  // In production we serve client and api from the same origin so this is
-  // effectively a no-op.
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  if (method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
 
   if (method === "POST" && url === "/api/chat") {
     handleChat(req, res).catch((error: unknown) => {
@@ -245,6 +250,16 @@ const httpServer = http.createServer((req, res) => {
   }
 
   if (method === "GET") {
+    // In dev, hand GETs to Vite middleware: it serves source files, transforms
+    // TSX/CSS on the fly, and runs HMR. The next() callback only fires if Vite
+    // didn't match — for an SPA that's effectively never.
+    if (viteDevServer) {
+      viteDevServer.middlewares(req, res, () => {
+        sendJson(res, 404, { error: `No route for GET ${url}` });
+      });
+      return;
+    }
+    // In prod, serve the prebuilt static bundle.
     handleStatic(url, res).catch((error: unknown) => {
       console.error(formatErrorWithContext("route:static", error));
     });
@@ -254,8 +269,27 @@ const httpServer = http.createServer((req, res) => {
   sendJson(res, 404, { error: `No route for ${method} ${url}` });
 });
 
+// Wire up Vite middleware in dev mode. The dynamic import keeps Vite out of
+// the prod runtime graph (it's a devDependency).
+if (IS_DEV) {
+  const { createServer: createViteServer } = await import("vite");
+  viteDevServer = await createViteServer({
+    configFile: VITE_CONFIG_PATH,
+    server: {
+      middlewareMode: true,
+      // Route Vite's HMR WebSocket through the same http server so everything
+      // lives on a single port — no separate :5173 anymore.
+      hmr: { server: httpServer },
+    },
+    appType: "spa",
+  });
+  console.log("[server] Vite middleware attached (dev mode)");
+}
+
 httpServer.listen(PORT, () => {
-  console.log(`[server] Listening on http://localhost:${PORT}`);
+  console.log(
+    `[server] Listening on http://localhost:${PORT} (${IS_DEV ? "dev" : "prod"})`,
+  );
 });
 
 // Graceful shutdown so `node --watch` restarts cleanly.

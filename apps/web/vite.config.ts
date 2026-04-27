@@ -1,31 +1,24 @@
 import path from "node:path";
 
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // Vite config for the web client.
-// `root` points at this directory so html/main.tsx are found here, while
-// the build output drops into apps/web/dist where the production server
-// looks for it. The /api proxy lets dev (port 5173) talk to the API
-// server (port 3000) without CORS preflight on every request.
+// Vite is consumed in two ways:
+//   1) `npm run build:web` — produces a static bundle into apps/web/dist for
+//      the production Node server to serve.
+//   2) Loaded as middleware by apps/server/index.ts in dev mode — same config,
+//      but Vite is not its own HTTP server in that case.
 //
 // `@bot` alias lets components import shared constants (like the welcome
-// message) from bot/shared/ - the same source the CLI and server use.
+// message) from bot/shared/ — the same source the CLI and server use.
 export default defineConfig({
   root: __dirname,
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@bot": path.resolve(__dirname, "..", "..", "bot"),
-    },
-  },
-  server: {
-    port: 5173,
-    proxy: {
-      "/api": {
-        target: "http://localhost:3000",
-        changeOrigin: true,
-      },
     },
   },
   build: {

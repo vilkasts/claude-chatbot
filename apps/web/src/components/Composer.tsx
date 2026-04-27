@@ -31,17 +31,19 @@ export const Composer = ({ disabled, onSend }: Props) => {
     setDraft("");
   };
 
+  const isSendDisabled = disabled || draft.trim().length === 0;
+
   return (
     <form
-      className="composer"
       onSubmit={(event) => {
         event.preventDefault();
         submit();
       }}
+      // pb arbitrary value keeps clearance under iOS home indicator (safe-area-inset-bottom).
+      className="flex shrink-0 items-end gap-2 border-t border-border-subtle bg-composer px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
     >
       <textarea
         ref={textareaRef}
-        className="composer__input"
         rows={1}
         placeholder="Напишите сообщение…"
         value={draft}
@@ -53,14 +55,22 @@ export const Composer = ({ disabled, onSend }: Props) => {
             submit();
           }
         }}
+        className="max-h-[140px] flex-1 resize-none rounded-control border border-border-subtle bg-chat px-3.5 py-2.5 text-text-primary outline-hidden transition-colors duration-[140ms] placeholder:text-text-placeholder focus:border-bubble-user disabled:cursor-not-allowed disabled:opacity-50"
       />
       <button
         type="submit"
-        className="composer__send"
-        disabled={disabled || draft.trim().length === 0}
+        disabled={isSendDisabled}
         aria-label="Отправить"
+        className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-bubble-user text-text-on-accent transition-[transform,background] duration-[140ms] not-disabled:hover:bg-bubble-user-hover not-disabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
+        {/* paper-plane icon points right; nudge up-left so it looks centered */}
+        <svg
+          viewBox="0 0 24 24"
+          width="22"
+          height="22"
+          aria-hidden
+          className="-translate-x-px translate-y-px"
+        >
           <path d="M3 11.5L21 3l-8.5 18-2.2-7.3L3 11.5z" fill="currentColor" />
         </svg>
       </button>
