@@ -16,9 +16,7 @@ import { buildSystem } from "../../bot/core/systemPrompt.js";
 import { getOrCreateSession, resetSession } from "./sessions.js";
 import { closeSseStream, openSseStream, writeSseEvent } from "./sseRelay.js";
 
-// Server config: port comes from env so deployments can override; paths are
-// resolved from cwd (the repo root) so the same code works under tsx (dev)
-// and under node on the compiled dist/ (prod).
+// Port comes from env so deployments can override without touching the code.
 const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 const DOCS_DIRECTORY = path.resolve(process.cwd(), "bot", "docs");
 const CLIENT_DIST_DIR = path.resolve(process.cwd(), "apps", "web", "dist");
@@ -29,13 +27,11 @@ const VITE_CONFIG_PATH = path.resolve(
   "vite.config.ts",
 );
 
-// Detect dev mode without NODE_ENV: in dev, this file is loaded as .ts via tsx
-// (cwd-relative path). In prod, it's the compiled .js inside dist/.
-// Cross-platform safe — no env var needed.
+// Dev detection without NODE_ENV: in dev this file is loaded as .ts via tsx;
+// in prod it lives inside dist/. Cross-platform safe, no env var needed.
 const IS_DEV = !import.meta.url.includes("/dist/");
 
-// MIME map for the static-file fallback. We only ship a handful of asset
-// kinds, so a tiny lookup table beats pulling in `mime-types`.
+// MIME map for static-file serving. A tiny lookup beats pulling in `mime-types`.
 const MIME_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
@@ -47,34 +43,56 @@ const MIME_TYPES: Record<string, string> = {
   ".ico": "image/x-icon",
 };
 
-// Read JSON body from a request stream. Throws if the body is not valid JSON.
-const readJsonBody = async (req: IncomingMessage): Promise<unknown> => {
+// ---------------------------------------------------------------------------
+// shared helpers
+// ---------------------------------------------------------------------------
+
+// Read all chunks from the request stream and JSON-parse them.
+const readJsonBody = async (request: IncomingMessage): Promise<unknown> => {
   const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(chunk as Buffer);
+  for await (const chunk of request) chunks.push(chunk as Buffer);
   const raw = Buffer.concat(chunks).toString("utf8");
   if (!raw) return {};
   return JSON.parse(raw);
 };
 
-// Tiny helper: send a plain JSON response with a status code.
 const sendJson = (
-  res: ServerResponse,
+  response: ServerResponse,
   status: number,
   payload: unknown,
 ): void => {
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
-  res.end(JSON.stringify(payload));
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+  });
+  response.end(JSON.stringify(payload));
 };
 
-// Validate the body of POST /api/chat and pull out the fields we care about.
-// Returns null + writes a 400 if the body is malformed.
-interface ChatRequestBody {
+// Read and parse the JSON body, sending a 400 and returning null on any failure.
+// Shared by handleChat and handleReset to avoid duplicating the try/catch.
+const readJsonBodyOrReject = async (
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<unknown | null> => {
+  try {
+    return await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, {
+      error: `Invalid JSON body: ${describeError(error)}`,
+    });
+    return null;
+  }
+};
+
+// Validate the body of POST /api/chat.
+// Returns null and writes a 400 if required fields are missing.
+type ChatRequestBody = {
   sessionId: string;
   message: string;
-}
+};
+
 const parseChatRequest = (
   body: unknown,
-  res: ServerResponse,
+  response: ServerResponse,
 ): ChatRequestBody | null => {
   if (
     !body ||
@@ -82,7 +100,7 @@ const parseChatRequest = (
     typeof (body as ChatRequestBody).sessionId !== "string" ||
     typeof (body as ChatRequestBody).message !== "string"
   ) {
-    sendJson(res, 400, {
+    sendJson(response, 400, {
       error: "Body must be { sessionId: string, message: string }.",
     });
     return null;
@@ -91,7 +109,7 @@ const parseChatRequest = (
 };
 
 // ---------------------------------------------------------------------------
-// boot: load docs once, then start the http server
+// boot
 // ---------------------------------------------------------------------------
 
 const bootDeps = async () => {
@@ -114,86 +132,74 @@ const deps = await bootDeps();
 // route handlers
 // ---------------------------------------------------------------------------
 
-// POST /api/chat - opens an SSE stream, runs ask(), relays text chunks.
+// POST /api/chat — opens an SSE stream, runs ask(), relays text chunks to the client.
 const handleChat = async (
-  req: IncomingMessage,
-  res: ServerResponse,
+  request: IncomingMessage,
+  response: ServerResponse,
 ): Promise<void> => {
-  let body: unknown;
-  try {
-    body = await readJsonBody(req);
-  } catch (error) {
-    sendJson(res, 400, { error: `Invalid JSON body: ${describeError(error)}` });
-    return;
-  }
+  const body = await readJsonBodyOrReject(request, response);
+  if (body === null) return;
 
-  const parsed = parseChatRequest(body, res);
+  const parsed = parseChatRequest(body, response);
   if (!parsed) return;
 
   const session = getOrCreateSession(parsed.sessionId, deps);
 
-  openSseStream(res);
+  openSseStream(response);
 
-  // If the client disconnects mid-stream we still want to consume the model
-  // response (so history stays consistent), but we stop writing to the socket.
+  // If the client disconnects mid-stream we keep consuming the model response
+  // (so history stays consistent) but stop writing to the closed socket.
   let clientStillConnected = true;
-  req.on("close", () => {
+  request.on("close", () => {
     clientStillConnected = false;
   });
 
   try {
     const result = await session.ask(parsed.message, {
       onText: (chunk) => {
-        if (clientStillConnected) writeSseEvent(res, "chunk", { text: chunk });
+        if (clientStillConnected)
+          writeSseEvent(response, "chunk", { text: chunk });
       },
     });
-    writeSseEvent(res, "done", {
+    writeSseEvent(response, "done", {
       usage: result.usage,
       kind: result.kind,
       topic: result.topic,
     });
   } catch (error) {
-    const message = describeError(error);
     console.error(formatErrorWithContext("chat", error));
-    writeSseEvent(res, "error", { message });
+    writeSseEvent(response, "error", { message: describeError(error) });
   } finally {
-    closeSseStream(res);
+    closeSseStream(response);
   }
 };
 
-// POST /api/reset - clears the session's history.
+// POST /api/reset — clears the session's conversation history.
 const handleReset = async (
-  req: IncomingMessage,
-  res: ServerResponse,
+  request: IncomingMessage,
+  response: ServerResponse,
 ): Promise<void> => {
-  let body: unknown;
-  try {
-    body = await readJsonBody(req);
-  } catch (error) {
-    sendJson(res, 400, { error: `Invalid JSON body: ${describeError(error)}` });
-    return;
-  }
+  const body = await readJsonBodyOrReject(request, response);
+  if (body === null) return;
 
   const sessionId = (body as { sessionId?: unknown })?.sessionId;
   if (typeof sessionId !== "string") {
-    sendJson(res, 400, { error: "Body must be { sessionId: string }." });
+    sendJson(response, 400, { error: "Body must be { sessionId: string }." });
     return;
   }
 
   resetSession(sessionId);
-  res.writeHead(204);
-  res.end();
+  response.writeHead(204);
+  response.end();
 };
 
-// GET /* - static file serving for the built client.
-// Falls back to index.html so client-side routes (we have none yet, but it
-// is cheap to support) keep working.
+// GET /* — serves the prebuilt client bundle; falls back to index.html for unknown paths.
 const handleStatic = async (
-  reqUrl: string,
-  res: ServerResponse,
+  requestUrl: string,
+  response: ServerResponse,
 ): Promise<void> => {
-  // Strip query string and decode URI-escapes before joining with disk path.
-  const urlPath = decodeURIComponent(reqUrl.split("?")[0] ?? "/");
+  // Decode URI-escapes and strip query string before joining with the disk path.
+  const urlPath = decodeURIComponent(requestUrl.split("?")[0] ?? "/");
   const safePath = urlPath.replace(/\.\./g, ""); // crude path-traversal guard
   const candidate =
     safePath === "/" ? "index.html" : safePath.replace(/^\//, "");
@@ -203,21 +209,21 @@ const handleStatic = async (
     const fileStat = await stat(fullPath);
     if (!fileStat.isFile()) throw new Error("not a file");
     const extension = path.extname(fullPath).toLowerCase();
-    res.writeHead(200, {
+    response.writeHead(200, {
       "Content-Type": MIME_TYPES[extension] ?? "application/octet-stream",
     });
-    createReadStream(fullPath).pipe(res);
+    createReadStream(fullPath).pipe(response);
   } catch {
-    // Fallback to index.html for unknown routes (SPA-friendly).
+    // Unknown path — fall back to index.html (SPA-friendly behaviour).
     const indexPath = path.join(CLIENT_DIST_DIR, "index.html");
     try {
       await stat(indexPath);
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      createReadStream(indexPath).pipe(res);
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      createReadStream(indexPath).pipe(response);
     } catch {
-      sendJson(res, 404, {
+      sendJson(response, 404, {
         error:
-          "Client bundle not found. Run `npm run build:web` first, or use `npm run dev:web` for development.",
+          "Client bundle not found. Run `npm run build:web` first, or use `npm run dev:server` for development.",
       });
     }
   }
@@ -227,58 +233,53 @@ const handleStatic = async (
 // http server
 // ---------------------------------------------------------------------------
 
-// Vite dev server lives here when IS_DEV. In prod it stays null and we serve
-// the prebuilt bundle from CLIENT_DIST_DIR via handleStatic.
+// Vite dev server is attached here in dev mode; null in prod.
 let viteDevServer: ViteDevServer | null = null;
 
-const httpServer = http.createServer((req, res) => {
-  const url = req.url ?? "/";
-  const method = req.method ?? "GET";
+const httpServer = http.createServer((request, response) => {
+  const url = request.url ?? "/";
+  const method = request.method ?? "GET";
 
   if (method === "POST" && url === "/api/chat") {
-    handleChat(req, res).catch((error: unknown) => {
+    handleChat(request, response).catch((error: unknown) => {
       console.error(formatErrorWithContext("route:chat", error));
     });
     return;
   }
 
   if (method === "POST" && url === "/api/reset") {
-    handleReset(req, res).catch((error: unknown) => {
+    handleReset(request, response).catch((error: unknown) => {
       console.error(formatErrorWithContext("route:reset", error));
     });
     return;
   }
 
   if (method === "GET") {
-    // In dev, hand GETs to Vite middleware: it serves source files, transforms
-    // TSX/CSS on the fly, and runs HMR. The next() callback only fires if Vite
-    // didn't match — for an SPA that's effectively never.
+    // In dev, Vite middleware handles source transforms and HMR.
+    // next() fires only if Vite didn't match the path — effectively never for an SPA.
     if (viteDevServer) {
-      viteDevServer.middlewares(req, res, () => {
-        sendJson(res, 404, { error: `No route for GET ${url}` });
+      viteDevServer.middlewares(request, response, () => {
+        sendJson(response, 404, { error: `No route for GET ${url}` });
       });
       return;
     }
-    // In prod, serve the prebuilt static bundle.
-    handleStatic(url, res).catch((error: unknown) => {
+    handleStatic(url, response).catch((error: unknown) => {
       console.error(formatErrorWithContext("route:static", error));
     });
     return;
   }
 
-  sendJson(res, 404, { error: `No route for ${method} ${url}` });
+  sendJson(response, 404, { error: `No route for ${method} ${url}` });
 });
 
-// Wire up Vite middleware in dev mode. The dynamic import keeps Vite out of
-// the prod runtime graph (it's a devDependency).
+// Wire up Vite in dev mode. Dynamic import keeps Vite out of the prod bundle.
 if (IS_DEV) {
   const { createServer: createViteServer } = await import("vite");
   viteDevServer = await createViteServer({
     configFile: VITE_CONFIG_PATH,
     server: {
       middlewareMode: true,
-      // Route Vite's HMR WebSocket through the same http server so everything
-      // lives on a single port — no separate :5173 anymore.
+      // Route Vite's HMR WebSocket through the same http server — single port in dev.
       hmr: { server: httpServer },
     },
     appType: "spa",
@@ -292,7 +293,7 @@ httpServer.listen(PORT, () => {
   );
 });
 
-// Graceful shutdown so `node --watch` restarts cleanly.
+// Graceful shutdown so `node --watch` restarts cleanly without port conflicts.
 const shutdown = (signal: string) => {
   console.log(`[server] Received ${signal}, shutting down.`);
   httpServer.close(() => process.exit(0));

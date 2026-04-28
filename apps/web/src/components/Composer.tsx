@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-interface Props {
+type Props = {
   disabled: boolean;
   onSend: (text: string) => void;
-}
+};
 
 const MAX_TEXTAREA_ROWS = 5;
 

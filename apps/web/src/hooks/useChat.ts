@@ -1,5 +1,5 @@
 import { WELCOME_MESSAGE } from "@bot/shared/greeting";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import { resetChatOnServer, streamChat } from "../lib/sseClient";
 
@@ -16,8 +16,7 @@ export interface ChatMessage {
 const SESSION_STORAGE_KEY = "clientsy.sessionId";
 
 // Pull the session id from localStorage, or generate one and persist it.
-// Each browser/device gets one persistent id - that way refreshes within
-// the lifetime of the server keep your conversation history intact.
+// Each browser gets one persistent id so refreshes keep conversation history intact.
 const loadOrCreateSessionId = (): string => {
   const stored = window.localStorage.getItem(SESSION_STORAGE_KEY);
   if (stored) return stored;
@@ -26,36 +25,41 @@ const loadOrCreateSessionId = (): string => {
   return fresh;
 };
 
-// Build the bot's welcome message - lives on the client only, no api call.
-const buildInitialMessages = (): ChatMessage[] => [
-  {
-    id: crypto.randomUUID(),
-    role: "bot",
-    text: WELCOME_MESSAGE,
-    status: "done",
-  },
-];
+const buildWelcomeMessage = (): ChatMessage => ({
+  id: crypto.randomUUID(),
+  role: "bot",
+  text: WELCOME_MESSAGE,
+  status: "done",
+});
 
-interface UseChatReturn {
+type UseChatReturn = {
   messages: ChatMessage[];
   isThinking: boolean;
   sendMessage: (text: string) => void;
   resetChat: () => void;
-}
+};
 
 export const useChat = (): UseChatReturn => {
-  const [messages, setMessages] = useState<ChatMessage[]>(buildInitialMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
+    buildWelcomeMessage(),
+  ]);
   const [isThinking, setIsThinking] = useState(false);
-  // sessionId persists across re-renders without triggering them.
-  const sessionIdRef = useRef<string>("");
 
-  useEffect(() => {
-    sessionIdRef.current = loadOrCreateSessionId();
-  }, []);
+  // Initialized once on mount — no useEffect needed.
+  const sessionIdRef = useRef(loadOrCreateSessionId());
+
+  // Holds the AbortController for the in-flight stream so we can cancel it
+  // if the user sends a new message before the previous one finishes.
+  const activeStreamAbortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
+
+    // Cancel any in-flight stream before starting a new one.
+    activeStreamAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    activeStreamAbortControllerRef.current = abortController;
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -63,18 +67,19 @@ export const useChat = (): UseChatReturn => {
       text: trimmed,
       status: "done",
     };
+
     const botMessageId = crypto.randomUUID();
-    const botPlaceholder: ChatMessage = {
+    const botStreamingMessage: ChatMessage = {
       id: botMessageId,
       role: "bot",
       text: "",
       status: "streaming",
     };
 
-    setMessages((current) => [...current, userMessage, botPlaceholder]);
+    setMessages((current) => [...current, userMessage, botStreamingMessage]);
     setIsThinking(true);
 
-    // Helper that mutates the bot message in our state by id.
+    // Patch only the bot message that belongs to this particular send() call.
     const updateBotMessage = (patch: (current: ChatMessage) => ChatMessage) => {
       setMessages((current) =>
         current.map((message) =>
@@ -86,8 +91,9 @@ export const useChat = (): UseChatReturn => {
     void streamChat({
       sessionId: sessionIdRef.current,
       message: trimmed,
+      signal: abortController.signal,
       onChunk: (chunkText) => {
-        // First chunk arrived - hide the typing indicator.
+        // First chunk arrived — hide the typing indicator.
         setIsThinking(false);
         updateBotMessage((message) => ({
           ...message,
@@ -110,8 +116,9 @@ export const useChat = (): UseChatReturn => {
   }, []);
 
   const resetChat = useCallback(() => {
+    activeStreamAbortControllerRef.current?.abort();
     void resetChatOnServer(sessionIdRef.current);
-    setMessages(buildInitialMessages());
+    setMessages([buildWelcomeMessage()]);
     setIsThinking(false);
   }, []);
 

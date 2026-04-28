@@ -52,7 +52,7 @@ export const App = () => {
         <div ref={bottomSentinelRef} />
       </main>
 
-      <Composer disabled={false} onSend={sendMessage} />
+      <Composer disabled={isThinking} onSend={sendMessage} />
     </div>
   );
 };

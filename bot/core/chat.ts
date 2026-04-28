@@ -51,12 +51,12 @@ export interface ChatSession {
 }
 
 // Internal representation after defaults are applied.
-interface ResolvedConfig {
+type ResolvedConfig = {
   model: string;
   maxTokens: number;
   temperature: number;
   maxHistoryMessages: number;
-}
+};
 
 // Default request settings - overridable via createChatSession({...})
 const DEFAULT_CONFIG: ResolvedConfig = {
@@ -108,9 +108,9 @@ const RESPONSE_CLASSIFICATION_TOOLS: Anthropic.Tool[] = [
 
 // Tool input shape - we know our schema requires `topic: string`, so we narrow
 // `unknown` to that here for the classifier function.
-interface ClassificationToolInput {
+type ClassificationToolInput = {
   topic?: string;
-}
+};
 
 // Look at the response content and decide whether the model classified the
 // reply as a refusal (`not_in_docs` / `off_topic`) or a normal answer.

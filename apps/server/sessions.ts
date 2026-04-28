@@ -8,10 +8,10 @@ import type { LoadedDocs } from "../../bot/core/loadDocs.js";
 // need redis or a database keyed on a real user id.
 const sessionsBySessionId = new Map<string, ChatSession>();
 
-interface SessionDeps {
+type SessionDeps = {
   docs: LoadedDocs;
   system: string;
-}
+};
 
 // Look up an existing chat session for `sessionId`, or create a fresh one
 // the first time we see it. Same docs/system across all sessions.

@@ -14,21 +14,21 @@ import { gradeAnswer } from "./grader.js";
 
 // One row from dataset.json. We trust the file shape - if the JSON is wrong
 // the runner will fail loud and that's fine for an internal tool.
-interface TestCase {
+type TestCase = {
   id: string;
   category: string;
   question: string;
   criteria: string[];
-}
+};
 
 // CLI args after parsing - both flags are optional.
-interface CliArgs {
+type CliArgs = {
   limit: number | null;
   category: string | null;
-}
+};
 
 // Result of running ONE test case end-to-end (ask + grade).
-interface CaseResult {
+type CaseResult = {
   id: string;
   category: string;
   question: string;
@@ -38,20 +38,20 @@ interface CaseResult {
   grade: Grade;
   ms: number;
   error: string | null;
-}
+};
 
 // Per-category summary used in the printed report.
-interface CategorySummary {
+type CategorySummary = {
   avg: number;
   n: number;
-}
+};
 
 // Aggregated results across the whole dataset.
-interface AggregatedResults {
+type AggregatedResults = {
   overallAvg: number;
   byCategorySummary: Record<string, CategorySummary>;
   worstThree: CaseResult[];
-}
+};
 
 // Resolve paths relative to this script - works regardless of where you run it from.
 const currentScriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -192,9 +192,9 @@ const aggregateResults = (results: CaseResult[]): AggregatedResults => {
   return { overallAvg, byCategorySummary, worstThree };
 };
 
-interface SummaryPrintInput extends AggregatedResults {
+type SummaryPrintInput = AggregatedResults & {
   totalCount: number;
-}
+};
 
 // Print a human-friendly summary to the terminal.
 const printSummaryToConsole = (input: SummaryPrintInput): void => {
@@ -218,11 +218,11 @@ const printSummaryToConsole = (input: SummaryPrintInput): void => {
   }
 };
 
-interface SaveResultsInput {
+type SaveResultsInput = {
   results: CaseResult[];
   overallAvg: number;
   byCategorySummary: Record<string, CategorySummary>;
-}
+};
 
 // Persist the full results JSON to disk so we can compare runs over time.
 const saveResultsJson = async (input: SaveResultsInput): Promise<string> => {

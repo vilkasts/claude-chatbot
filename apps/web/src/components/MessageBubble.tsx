@@ -1,8 +1,8 @@
 import type { ChatMessage } from "../hooks/useChat";
 
-interface Props {
+type Props = {
   message: ChatMessage;
-}
+};
 
 const BUBBLE_BASE =
   "max-w-[80%] whitespace-pre-wrap break-words rounded-bubble px-3.5 py-2.5 shadow-bubble animate-bubble-in";

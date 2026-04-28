@@ -19,12 +19,12 @@ const DOCS_DIRECTORY = "./bot/docs";
 // Haiku 4.5 pricing (USD per 1M tokens). Update if Anthropic changes prices
 // or if we switch to Sonnet/Opus. cacheRead is ~10% of normal input - that's
 // where the savings come from across multi-turn sessions.
-interface PricingTable {
+type PricingTable = {
   input: number;
   output: number;
   cacheWrite: number;
   cacheRead: number;
-}
+};
 
 const PRICING_USD_PER_MILLION: PricingTable = {
   input: 1,
@@ -34,13 +34,13 @@ const PRICING_USD_PER_MILLION: PricingTable = {
 };
 
 // Inputs for the stats footer that appears under every reply.
-interface StatsLineInput {
+type StatsLineInput = {
   usage: Anthropic.Usage;
   estimatedInputTokens: number | null;
   kind: ResponseKind;
   topic: string | undefined;
   requestCostUsd: number;
-}
+};
 
 // ---------------------------------------------------------------------------
 // boot: load documentation and start a session
