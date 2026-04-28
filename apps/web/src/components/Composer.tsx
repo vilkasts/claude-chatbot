@@ -55,7 +55,7 @@ export const Composer = ({ disabled, onSend }: Props) => {
             submit();
           }
         }}
-        className="max-h-[140px] flex-1 resize-none rounded-control border border-border-subtle bg-chat px-3.5 py-2.5 text-text-primary outline-hidden transition-colors duration-[140ms] placeholder:text-text-placeholder focus:border-bubble-user disabled:cursor-not-allowed disabled:opacity-50"
+        className="max-h-[140px] flex-1 resize-none rounded-xl border border-border-subtle bg-chat px-3.5 py-2.5 text-text-primary outline-hidden transition-colors duration-[140ms] placeholder:text-text-placeholder focus:border-bubble-user disabled:cursor-not-allowed disabled:opacity-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       />
       <button
         type="submit"
