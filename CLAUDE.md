@@ -10,15 +10,18 @@ User-facing language is **Russian** (system prompt, refusal phrases, eval criter
 
 ## Commands
 
+All scripts read `ANTHROPIC_API_KEY` from `.env` via `--env-file` (no dotenv package).
+
 ```bash
 # Dev (separate processes)
 npm run dev:cli                       # CLI REPL with watch
-npm run dev:server                    # API + Vite middleware on :3000 (single port)
+npm run dev                           # API + Vite middleware on :3000 (single port)
 
 # Build + prod start
-npm run build                         # build:node + build:web
+npm run build:cli                     # tsc -p tsconfig.build.json → dist/ (CLI + server)
+npm run build                         # build:cli + vite build → apps/web/dist/
 npm run start:cli                     # run compiled CLI
-npm run start:server                  # run compiled server (serves apps/web/dist)
+npm run start                         # run compiled server (serves apps/web/dist)
 
 # Type-check / lint / format (pre-commit hook runs these in order)
 npm run tsc                           # cli + server (excludes apps/web)
@@ -32,7 +35,9 @@ npm run eval -- --category=in_corpus  # one category
 npm run eval -- --limit=5             # first N cases
 ```
 
-There is no test runner — quality is verified through the eval harness, not unit tests. To check a single eval case, use `--limit=1` with a filter, or temporarily edit `bot/evals/dataset.json`.
+There is no test runner — quality is verified through the eval harness, not unit tests. To check a single eval case, use `--limit=1` with a filter, or temporarily edit `bot/evals/dataset.json`. Each run writes `bot/evals/results/results-<timestamp>.json` (`overallAvg`, `byCategory`, per-case grades) — diff against the latest one to spot regressions. Evals hit the real API and cost money (2 Haiku calls per case).
+
+Script names were renamed in `b909f0b` (`dev:server` → `dev`, `build:node` → `build:cli`, `start:server` → `start`, `build:web` folded into `build`). README, the 404 message in `apps/server/index.ts`, and the comment in `apps/web/vite.config.ts` still use the old names — trust `package.json`.
 
 ## Architecture
 
@@ -43,6 +48,8 @@ There is no test runner — quality is verified through the eval harness, not un
 - **CLI** (`apps/cli/index.ts`) — readline REPL, prints streaming chunks to stdout, computes per-request USD cost from `usage` (Haiku-4.5 pricing table inline). Slash commands: `/reset`, `/usage`, `exit`.
 - **Server** (`apps/server/index.ts`) — raw `http.createServer`, exposes `POST /api/chat` (SSE) and `POST /api/reset`. In dev, dynamically imports Vite and attaches `vite.middlewares` to GET requests; in prod, serves prebuilt `apps/web/dist/`. Single port :3000 in both modes.
 - **Web** (`apps/web/`) — React 19 + Vite + Tailwind v4, talks to the same server via `useChat` hook + `lib/sseClient.ts`. The `@bot/*` alias lets the browser bundle import constants from `bot/shared/` (e.g. `WELCOME_MESSAGE`).
+
+Server sessions live in an in-memory `Map<sessionId, ChatSession>` (`apps/server/sessions.ts`, no TTL, lost on restart); the web client persists its `sessionId` in `localStorage` (`clientsy.sessionId`). If the browser aborts a stream, the server deliberately keeps consuming the model response so server-side history stays consistent. SSE events are `chunk` / `done` (carries `usage`, `kind`, `topic`) / `error`; the web client parses them manually over `fetch` because `EventSource` can't POST a body.
 
 When changing the conversation contract (history shape, classification kinds, refusal phrases), check **all three** transports — they're loosely coupled through `AskResult`.
 
@@ -85,13 +92,15 @@ Adding a new doc to `bot/docs/`? Add corresponding test cases for **each** categ
 
 ### Knowledge base sourcing
 
-`bot/docs/{BUSINESS,CLIENT,EMPLOYEE}.md` are NOT free-form. They mirror the Clientsy app's help widget verbatim — source files live in the sibling repo at `../clientsy-app/src/widgets/business/help/data/faq-items-*.ts` plus locales `../clientsy-app/src/shared/lib/i18n/locales/ru/*.json`. When the app's UI labels change, regenerate these docs from those sources. Each MD file follows the same structure: `0. Контекст` → `1. Глоссарий иконок` → `2. FAQ` → `3. Справочник терминов` → `4. Подсказки для бота`. Keep the structure consistent across roles — the embedder/RAG retrieves better with uniform shapes.
+`bot/docs/{BUSINESS,CLIENT,EMPLOYEE}.md` are NOT free-form. They mirror the Clientsy app's help widget verbatim — source files live in the sibling repo at `../clientsy-app/src/widgets/business/help/data/faq-items-*.ts` plus locales `../clientsy-app/src/shared/lib/i18n/locales/ru/*.json`. When the app's UI labels change, regenerate these docs from those sources. Each MD file follows the same structure: `0. Контекст` → `1. Глоссарий иконок` → `2. FAQ` → `3. Справочник терминов` → `4. Подсказки для бота`. Keep the structure consistent across roles — the model navigates uniform shapes more reliably. There is no RAG/embedder: the whole corpus is stuffed into turn 1 (`loadDocs` warns past ~150k tokens as the signal to switch to retrieval).
+
+Note: `SYSTEM_INSTRUCTION` frames the bot for the «Владелец бизнеса» role only, while all three role docs are loaded. Questions from client/employee perspective aren't explicitly handled by the prompt, and most eval cases target `BUSINESS.md`.
 
 ## Conventions worth knowing
 
 - **Import paths to bot/core use `.js` extensions** (`from '../../bot/core/chat.js'`) even though the source is `.ts`. This is required for NodeNext ESM module resolution. The `apps/web` side imports from `@bot/*` alias instead.
-- **`tsconfig.build.json` excludes `apps/web/**`** — the Node build (`build:node`) compiles only CLI + server. Web is a separate Vite build (`build:web`).
-- **`dev:server` uses `tsx watch` with explicit `--include`**, not `node --watch`. Reason: `node --watch` in Node 20+ also watches files imported from `node_modules`, and Vite touches its dep cache on startup → restart loop. Don't switch back to `node --watch` here. CLI is fine with `node --watch` because it doesn't import Vite.
+- **`tsconfig.build.json` excludes `apps/web/**`** — the Node build (`build:cli`) compiles only CLI + server. Web is built by the `vite build` step inside `npm run build`.
+- **`npm run dev` (server) uses `tsx watch` with explicit `--include`**, not `node --watch`. Reason: `node --watch` in Node 20+ also watches files imported from `node_modules`, and Vite touches its dep cache on startup → restart loop. Don't switch back to `node --watch` here. CLI is fine with `node --watch` because it doesn't import Vite.
 - **CORS is intentionally absent**. Same origin everywhere now (Vite middleware + API on :3000 in dev, prod is one port too). Don't reintroduce it.
 - **Tailwind v4 — no `tailwind.config.js`**. Design tokens live in `apps/web/src/styles.css` under `@theme {}`; keyframes are plain CSS but referenced via `--animate-*` vars in `@theme` to generate `animate-*` utilities.
 - **Pre-commit hook** runs `tsc → tsc:web → lint → format` via Husky v9 (`.husky/pre-commit`). Hook runs scripts that _modify files_ (`--fix`, `--write`); if they touch your staged files, the auto-fixes land in your working copy but **not in the commit** — re-stage and amend or make a new commit. There is no `lint-staged` integration.
@@ -103,3 +112,7 @@ Adding a new doc to `bot/docs/`? Add corresponding test cases for **each** categ
 - Grader: `claude-haiku-4-5` (`bot/evals/grader.ts` → `GRADER_MODEL`).
 
 `temperature: 0` in both — required for eval reproducibility.
+
+## Project-local Claude tooling
+
+`.claude/skills/` holds guardrail skills that encode the invariants above — prefer them over ad-hoc edits: `chat-core-refactor` (editing `bot/core/chat.ts`), `system-prompt-tune` (editing `systemPrompt.ts`), `knowledge-sync` (regenerate docs from `../clientsy-app`), `clientsy-faq-add` (one FAQ card + eval cases), `eval-suite` (run + compare to last baseline), `pr-review`. The `bot-guardian` agent picks the right one after changes under `bot/`.
